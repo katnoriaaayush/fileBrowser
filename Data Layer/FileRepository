@@ -1,0 +1,32 @@
+package com.example.filebrowser.data;
+
+import android.net.Uri;
+
+import com.example.filebrowser.model.FileItem;
+
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Facade repository to abstract storage sources:
+ * - SAF for arbitrary external folders (user granted)
+ * - MediaStore for media collections
+ */
+public class FileRepository {
+    private final MediaRepository mediaRepository;
+    private final DocumentRepository documentRepository;
+
+    public FileRepository(MediaRepository mediaRepository, DocumentRepository documentRepository) {
+        this.mediaRepository = mediaRepository;
+        this.documentRepository = documentRepository;
+    }
+
+    public List<FileItem> listTree(Uri treeUri) {
+        if (treeUri == null) return Collections.emptyList();
+        return documentRepository.listChildren(treeUri);
+    }
+
+    public List<FileItem> listImages() { return mediaRepository.getImages(); }
+    public List<FileItem> listVideos() { return mediaRepository.getVideos(); }
+    public List<FileItem> listAudio()  { return mediaRepository.getAudio(); }
+}

@@ -1,0 +1,51 @@
+package com.example.filebrowser.data;
+
+import android.content.Context;
+import android.net.Uri;
+
+import androidx.documentfile.provider.DocumentFile;
+
+import com.example.filebrowser.model.FileItem;
+import com.example.filebrowser.model.FileType;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * SAF (Storage Access Framework) operations for user-granted folders.
+ * Use DocumentFile APIs to traverse content trees safely across Android versions.
+ */
+public class DocumentRepository {
+    private final Context appContext;
+
+    public DocumentRepository(Context context) {
+        this.appContext = context.getApplicationContext();
+    }
+
+    public List<FileItem> listChildren(Uri treeUri) {
+        List<FileItem> items = new ArrayList<>();
+        DocumentFile root = DocumentFile.fromTreeUri(appContext, treeUri);
+        if (root == null) return items;
+        for (DocumentFile f : root.listFiles()) {
+            String name = f.getName() != null ? f.getName() : "(unnamed)";
+            String mime = f.getType();
+            long size = f.length();
+            long lastMod = f.lastModified();
+            boolean isDir = f.isDirectory();
+            FileType type = isDir ? FileType.FOLDER : classify(mime);
+            items.add(new FileItem(name, f.getUri(), mime, size, lastMod, isDir, type));
+        }
+        return items;
+    }
+
+    private FileType classify(String mime) {
+        if (mime == null) return FileType.OTHER;
+        if (mime.startsWith("image/")) return FileType.IMAGE;
+        if (mime.startsWith("video/")) return FileType.VIDEO;
+        if (mime.startsWith("audio/")) return FileType.AUDIO;
+        if (mime.equals("application/zip")
+                || mime.equals("application/x-7z-compressed")
+                || mime.equals("application/x-rar-compressed")) return FileType.ARCHIVE;
+        return FileType.DOCUMENT;
+    }
+}

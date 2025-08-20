@@ -1,0 +1,8 @@
+package com.example.filebrowser.model;
+
+/**
+ * Logical file categories for icons and filtering.
+ */
+public enum FileType {
+    DOCUMENT, IMAGE, VIDEO, AUDIO, ARCHIVE, FOLDER, OTHER
+}

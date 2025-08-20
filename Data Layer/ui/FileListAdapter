@@ -1,0 +1,96 @@
+package com.example.filebrowser.ui.adapters;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.filebrowser.R;
+import com.example.filebrowser.model.FileItem;
+import com.example.filebrowser.model.FileType;
+
+import java.text.DateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * RecyclerView adapter for files/folders.
+ * Handles click and long-click via a listener interface.
+ */
+public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.VH> {
+
+    public interface Listener {
+        void onFolder(FileItem item);
+        void onFile(FileItem item);
+        void onFileLong(FileItem item);
+    }
+
+    private final List<FileItem> data = new ArrayList<>();
+    private Listener listener;
+
+    public void setListener(Listener listener) { this.listener = listener; }
+
+    public void submit(List<FileItem> items) {
+        data.clear();
+        if (items != null) data.addAll(items);
+        notifyDataSetChanged();
+    }
+
+    @NonNull @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_file, parent, false));
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull VH h, int position) {
+        FileItem item = data.get(position);
+        h.name.setText(item.getName());
+        String subtitle = (item.isDirectory() ? "Folder" : human(item.getSize())) + " • " +
+                DateFormat.getDateTimeInstance().format(new Date(item.getLastModified()));
+        h.subtitle.setText(subtitle);
+        h.icon.setImageResource(iconFor(item.getType(), item.isDirectory()));
+        h.itemView.setOnClickListener(v -> {
+            if (item.isDirectory()) {
+                if (listener != null) listener.onFolder(item);
+            } else if (listener != null) listener.onFile(item);
+        });
+        h.itemView.setOnLongClickListener(v -> { if (listener != null) listener.onFileLong(item); return true; });
+    }
+
+    @Override public int getItemCount() { return data.size(); }
+
+    static class VH extends RecyclerView.ViewHolder {
+        ImageView icon; TextView name; TextView subtitle;
+        VH(@NonNull View itemView) {
+            super(itemView);
+            icon = itemView.findViewById(R.id.icon);
+            name = itemView.findViewById(R.id.name);
+            subtitle = itemView.findViewById(R.id.subtitle);
+        }
+    }
+
+    private static String human(long bytes) {
+        if (bytes <= 0) return "0B";
+        if (bytes < 1024) return bytes + "B";
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        char pre = "KMGTPE".charAt(exp - 1);
+        return String.format("%.1f%cB", bytes / Math.pow(1024, exp), pre);
+    }
+
+    private static int iconFor(FileType type, boolean isDir) {
+        if (isDir) return android.R.drawable.ic_menu_agenda;
+        switch (type) {
+            case IMAGE: return android.R.drawable.ic_menu_gallery;
+            case VIDEO: return android.R.drawable.ic_media_play;
+            case AUDIO: return android.R.drawable.ic_lock_silent_mode_off;
+            case ARCHIVE: return android.R.drawable.ic_menu_save;
+            case DOCUMENT: return android.R.drawable.ic_menu_edit;
+            default: return android.R.drawable.ic_menu_help;
+        }
+    }
+}

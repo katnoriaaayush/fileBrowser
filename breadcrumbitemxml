@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One crumb in the breadcrumb trail -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="4dp">
+
+        <TextView
+            android:id="@+id/breadcrumb_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"/>
+
+        <TextView
+            android:id="@+id/breadcrumb_arrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="›"
+            android:textSize="18sp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"/>
+    </LinearLayout>
+
+</merge>

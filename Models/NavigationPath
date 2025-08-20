@@ -1,0 +1,43 @@
+package com.example.filebrowser.model;
+
+import android.net.Uri;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Breadcrumb navigation state: stack of visited folders.
+ */
+public class NavigationPath {
+
+    public static class PathItem {
+        public final String name;
+        public final Uri uri;
+
+        public PathItem(String name, Uri uri) {
+            this.name = name;
+            this.uri = uri;
+        }
+    }
+
+    private final List<PathItem> items = new ArrayList<>();
+
+    public void resetTo(PathItem root) {
+        items.clear();
+        items.add(root);
+    }
+
+    public void push(PathItem item) {
+        items.add(item);
+    }
+
+    public void popToIndex(int index) {
+        if (index >= 0 && index < items.size()) {
+            while (items.size() > index + 1) {
+                items.remove(items.size() - 1);
+            }
+        }
+    }
+
+    public List<PathItem> getItems() { return items; }
+    public PathItem current() { return items.isEmpty() ? null : items.get(items.size()-1); }
+}

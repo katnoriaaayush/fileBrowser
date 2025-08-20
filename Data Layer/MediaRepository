@@ -1,0 +1,61 @@
+package com.example.filebrowser.data;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.MediaStore;
+
+import androidx.annotation.Nullable;
+
+import com.example.filebrowser.model.FileItem;
+import com.example.filebrowser.model.FileType;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * MediaStore access for images, videos, audio.
+ * Requires granular permissions on Android 13+ or READ_EXTERNAL_STORAGE on older devices.
+ */
+public class MediaRepository {
+    private final ContentResolver cr;
+
+    public MediaRepository(Context context) {
+        this.cr = context.getApplicationContext().getContentResolver();
+    }
+
+    private List<FileItem> queryMedia(Uri collection, FileType type) {
+        List<FileItem> out = new ArrayList<>();
+        String[] projection = new String[] {
+                MediaStore.MediaColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.MIME_TYPE,
+                MediaStore.MediaColumns.SIZE,
+                MediaStore.MediaColumns.DATE_MODIFIED
+        };
+        String order = MediaStore.MediaColumns.DATE_MODIFIED + " DESC";
+        try (Cursor cursor = cr.query(collection, projection, null, null, order)) {
+            if (cursor == null) return out;
+            int idIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID);
+            int nameIdx = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME);
+            int mimeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE);
+            int sizeIdx = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE);
+            int dateIdx = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED);
+            while (cursor.moveToNext()) {
+                long id = cursor.getLong(idIdx);
+                String name = cursor.getString(nameIdx);
+                String mime = mimeIdx >= 0 ? cursor.getString(mimeIdx) : null;
+                long size = sizeIdx >= 0 ? cursor.getLong(sizeIdx) : 0L;
+                long date = dateIdx >= 0 ? cursor.getLong(dateIdx) : 0L;
+                Uri uri = Uri.withAppendedPath(collection, String.valueOf(id));
+                out.add(new FileItem(name, uri, mime, size, date, false, type));
+            }
+        }
+        return out;
+    }
+
+    public List<FileItem> getImages() { return queryMedia(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, FileType.IMAGE); }
+    public List<FileItem> getVideos() { return queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, FileType.VIDEO); }
+    public List<FileItem> getAudio()  { return queryMedia(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, FileType.AUDIO); }
+}

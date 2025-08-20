@@ -1,0 +1,29 @@
+package com.example.filebrowser.ui;
+
+import androidx.annotation.NonNull;
+import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.ViewModelProvider;
+
+import com.example.filebrowser.data.FileRepository;
+
+/**
+ * Custom factory to pass FileRepository into the ViewModel constructor.
+ */
+public class FileListViewModelFactory implements ViewModelProvider.Factory {
+
+    private final FileRepository repository;
+
+    public FileListViewModelFactory(FileRepository repository) {
+        this.repository = repository;
+    }
+
+    @NonNull
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends ViewModel> T create(@NonNull Class<T> modelClass) {
+        if (modelClass.isAssignableFrom(FileListViewModel.class)) {
+            return (T) new FileListViewModel(repository);
+        }
+        throw new IllegalArgumentException("Unknown ViewModel class: " + modelClass.getName());
+    }
+}

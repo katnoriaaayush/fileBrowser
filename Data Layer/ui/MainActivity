@@ -1,0 +1,113 @@
+package com.example.filebrowser.ui;
+
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.TextView;
+
+import androidx.activity.ComponentActivity;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.annotation.Nullable;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.filebrowser.R;
+import com.example.filebrowser.data.DocumentRepository;
+import com.example.filebrowser.data.FileRepository;
+import com.example.filebrowser.data.MediaRepository;
+import com.example.filebrowser.model.FileItem;
+import com.example.filebrowser.ui.adapters.FileListAdapter;
+import com.example.filebrowser.ui.widgets.BreadcrumbView;
+import com.example.filebrowser.util.PermissionManager;
+import com.example.filebrowser.util.StorageAccessManager;
+
+/**
+ * Activity manually creates repositories, wires them into a ViewModel via a custom factory,
+ * sets up RecyclerView + breadcrumb, and handles SAF + permissions.
+ */
+public class MainActivity extends ComponentActivity {
+
+    private FileListViewModel viewModel;
+    private FileListAdapter adapter;
+    private BreadcrumbView breadcrumb;
+    private TextView emptyView;
+
+    private ActivityResultLauncher<String[]> mediaPermsLauncher;
+    private ActivityResultLauncher<Intent> openTreeLauncher;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setContentView(R.layout.activity_main);
+
+        // 1) Manually construct dependencies (no DI)
+        MediaRepository mediaRepository = new MediaRepository(getApplicationContext());
+        DocumentRepository documentRepository = new DocumentRepository(getApplicationContext());
+        FileRepository fileRepository = new FileRepository(mediaRepository, documentRepository);
+
+        // 2) Create ViewModel with custom factory to pass repository
+        FileListViewModelFactory factory = new FileListViewModelFactory(fileRepository);
+        viewModel = new ViewModelProvider(this, factory).get(FileListViewModel.class);
+
+        // 3) View references
+        RecyclerView rv = findViewById(R.id.recycler_view);
+        emptyView = findViewById(R.id.empty_view);
+        breadcrumb = findViewById(R.id.breadcrumb_view);
+        Button btnOpenTree = findViewById(R.id.btn_open_tree);
+        Button btnPerms = findViewById(R.id.btn_request_media);
+
+        // 4) RecyclerView setup
+        adapter = new FileListAdapter();
+        rv.setLayoutManager(new LinearLayoutManager(this));
+        rv.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
+        rv.setAdapter(adapter);
+
+        // 5) Adapter interactions
+        adapter.setListener(new FileListAdapter.Listener() {
+            @Override public void onFolder(FileItem item) {
+                viewModel.navigateTo(item.getUri(), item.getName());
+            }
+            @Override public void onFile(FileItem item) {
+                // Try to open with an external viewer
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(item.getUri());
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(intent, "Open with"));
+            }
+            @Override public void onFileLong(FileItem item) {
+                // TODO: show contextual menu (rename, delete, share) via SAF ops.
+            }
+        });
+
+        // 6) Breadcrumb interaction
+        breadcrumb.setOnCrumbClick(pos -> viewModel.navigateToIndex(pos));
+
+        // 7) Observe ViewModel state
+        viewModel.getFiles().observe(this, list -> {
+            adapter.submit(list);
+            emptyView.setVisibility(list == null || list.isEmpty() ? android.view.View.VISIBLE : android.view.View.GONE);
+        });
+
+        viewModel.getNavPath().observe(this, breadcrumb::setPath);
+
+        // 8) Permission + SAF launchers
+        mediaPermsLauncher = registerForActivityResult(
+                new androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+                result -> {
+                    // You could react to granted/denied results here if you decide to list MediaStore.
+                }
+        );
+        openTreeLauncher = StorageAccessManager.openTreeLauncher(this, uri -> {
+            // When user picks a folder, set it as root and load contents
+            viewModel.setRoot(uri, "Root");
+        });
+
+        // 9) Button actions
+        btnOpenTree.setOnClickListener(v -> openTreeLauncher.launch(StorageAccessManager.openTreeIntent()));
+        btnPerms.setOnClickListener(v -> mediaPermsLauncher.launch(PermissionManager.mediaPermissions()));
+    }
+}

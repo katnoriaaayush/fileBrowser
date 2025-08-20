@@ -1,0 +1,77 @@
+package com.example.filebrowser.ui;
+
+import android.net.Uri;
+
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.ViewModel;
+
+import com.example.filebrowser.data.FileRepository;
+import com.example.filebrowser.model.FileItem;
+import com.example.filebrowser.model.NavigationPath;
+
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * ViewModel holds UI state (files list, loading, breadcrumb).
+ * Depends on FileRepository, provided via custom ViewModelFactory.
+ */
+public class FileListViewModel extends ViewModel {
+    private final FileRepository repository;
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
+
+    private final MutableLiveData<List<FileItem>> files = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> loading = new MutableLiveData<>(false);
+    private final MutableLiveData<NavigationPath> navPath = new MutableLiveData<>(new NavigationPath());
+
+    public FileListViewModel(FileRepository repository) {
+        this.repository = repository;
+    }
+
+    public LiveData<List<FileItem>> getFiles() { return files; }
+    public LiveData<Boolean> getLoading() { return loading; }
+    public LiveData<NavigationPath> getNavPath() { return navPath; }
+
+    public void setRoot(Uri rootUri, String label) {
+        NavigationPath path = new NavigationPath();
+        path.resetTo(new NavigationPath.PathItem(label, rootUri));
+        navPath.postValue(path);
+        load(rootUri);
+    }
+
+    public void navigateTo(Uri folderUri, String name) {
+        NavigationPath path = navPath.getValue();
+        if (path != null) {
+            path.push(new NavigationPath.PathItem(name, folderUri));
+            navPath.postValue(path);
+            load(folderUri);
+        }
+    }
+
+    public void navigateToIndex(int index) {
+        NavigationPath path = navPath.getValue();
+        if (path != null && index >= 0 && index < path.getItems().size()) {
+            path.popToIndex(index);
+            navPath.postValue(path);
+            NavigationPath.PathItem current = path.current();
+            if (current != null) load(current.uri);
+        }
+    }
+
+    private void load(Uri uri) {
+        loading.postValue(true);
+        io.submit(() -> {
+            List<FileItem> list = repository.listTree(uri);
+            files.postValue(list);
+            loading.postValue(false);
+        });
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        io.shutdownNow();
+    }
+}

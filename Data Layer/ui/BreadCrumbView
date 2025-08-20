@@ -1,0 +1,51 @@
+package com.example.filebrowser.ui.widgets;
+
+import android.content.Context;
+import android.util.AttributeSet;
+import android.view.LayoutInflater;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.view.View;
+import android.widget.TextView;
+
+import com.example.filebrowser.R;
+import com.example.filebrowser.model.NavigationPath;
+
+/**
+ * Simple breadcrumb showing the current navigation path.
+ * Emits callbacks when a crumb is tapped.
+ */
+public class BreadcrumbView extends HorizontalScrollView {
+
+    public interface OnCrumbClick {
+        void onCrumb(int position);
+    }
+
+    private LinearLayout container;
+    private OnCrumbClick listener;
+
+    public BreadcrumbView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        setFillViewport(true);
+        container = new LinearLayout(context);
+        container.setOrientation(LinearLayout.HORIZONTAL);
+        addView(container, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+    }
+
+    public void setOnCrumbClick(OnCrumbClick l) { this.listener = l; }
+
+    public void setPath(NavigationPath path) {
+        container.removeAllViews();
+        for (int i = 0; i < path.getItems().size(); i++) {
+            View item = LayoutInflater.from(getContext()).inflate(R.layout.breadcrumb_item, container, false);
+            TextView text = item.findViewById(R.id.breadcrumb_text);
+            TextView arrow = item.findViewById(R.id.breadcrumb_arrow);
+            text.setText(path.getItems().get(i).name);
+            arrow.setVisibility(i == path.getItems().size()-1 ? View.GONE : View.VISIBLE);
+            final int pos = i;
+            text.setOnClickListener(v -> { if (listener != null) listener.onCrumb(pos); });
+            container.addView(item);
+        }
+        post(() -> fullScroll(FOCUS_RIGHT));
+    }
+}

@@ -1,0 +1,34 @@
+package com.example.filebrowser.model;
+
+import android.net.Uri;
+
+/**
+ * Immutable view model for a file or folder row.
+ */
+public class FileItem {
+    private final String name;
+    private final Uri uri;
+    private final String mimeType;
+    private final long size;
+    private final long lastModified;
+    private final boolean directory;
+    private final FileType type;
+
+    public FileItem(String name, Uri uri, String mimeType, long size, long lastModified, boolean directory, FileType type) {
+        this.name = name;
+        this.uri = uri;
+        this.mimeType = mimeType;
+        this.size = size;
+        this.lastModified = lastModified;
+        this.directory = directory;
+        this.type = type;
+    }
+
+    public String getName() { return name; }
+    public Uri getUri() { return uri; }
+    public String getMimeType() { return mimeType; }
+    public long getSize() { return size; }
+    public long getLastModified() { return lastModified; }
+    public boolean isDirectory() { return directory; }
+    public FileType getType() { return type; }
+}
