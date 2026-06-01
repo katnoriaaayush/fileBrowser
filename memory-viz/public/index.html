@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android Memory Visualizer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;
+  --border:#30363d;--text:#e6edf3;--muted:#7d8590;
+  --green:#3fb950;--blue:#58a6ff;--orange:#f0883e;
+  --red:#f85149;--purple:#bc8cff;--yellow:#e3b341;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:14px 24px;display:flex;align-items:center;
+  justify-content:space-between;position:sticky;top:0;z-index:100
+}
+.logo{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600}
+.logo svg{width:22px;height:22px;stroke:var(--blue)}
+.hdr-right{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted)}
+.badge{
+  display:flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border)
+}
+.badge.ok{border-color:var(--green);color:var(--green)}
+.badge.err{border-color:var(--red);color:var(--red)}
+.badge.wait{border-color:var(--yellow);color:var(--yellow)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+main{padding:22px;max-width:1400px;margin:0 auto}
+.err-bar{
+  background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.4);
+  color:var(--red);padding:11px 16px;border-radius:8px;margin-bottom:18px;
+  font-size:13px;display:none
+}
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.card-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.card-val{font-size:22px;font-weight:700;line-height:1;margin-bottom:3px}
+.card-sub{font-size:11px;color:var(--muted)}
+.c-total .card-val{color:var(--blue)}
+.c-used  .card-val{color:var(--red)}
+.c-avail .card-val{color:var(--green)}
+.c-cache .card-val{color:var(--purple)}
+.c-buf   .card-val{color:var(--orange)}
+.c-swap  .card-val{color:var(--yellow)}
+/* Usage bar */
+.bar-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px}
+.bar-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:9px}
+.bar-track{height:18px;background:var(--surface2);border-radius:9px;overflow:hidden;display:flex}
+.seg{height:100%;transition:width .5s ease}
+.s-used{background:var(--red)}.s-cache{background:var(--purple)}.s-buf{background:var(--orange)}
+.legend{display:flex;gap:14px;margin-top:9px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.leg-dot{width:10px;height:10px;border-radius:3px}
+/* Charts */
+.charts{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:860px){.charts{grid-template-columns:1fr}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.chart-title{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin-bottom:14px}
+/* Table */
+.tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.tbl-hdr{padding:12px 18px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--surface2);padding:8px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:500}
+tbody tr{border-bottom:1px solid var(--border);transition:background .12s}
+tbody tr:hover{background:var(--surface2)}
+tbody tr:last-child{border-bottom:none}
+td{padding:7px 14px}
+.k{font-family:monospace;color:var(--blue)}
+.v{font-family:monospace;font-weight:600}
+.mini-bar{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;width:120px}
+.mini-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .5s ease}
+/* Swap section */
+.swap-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/>
+      <path d="M8 21h8M12 17v4M7 8h10M7 12h5"/>
+    </svg>
+    Android Memory Visualizer
+  </div>
+  <div class="hdr-right">
+    <span id="ts">—</span>
+    <div id="badge" class="badge wait">
+      <span class="dot pulse"></span>
+      <span id="badge-txt">Connecting</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="errBar" class="err-bar"></div>
+
+  <!-- Stat cards -->
+  <div class="cards">
+    <div class="card c-total"><div class="card-label">Total RAM</div><div class="card-val" id="cTotal">—</div><div class="card-sub" id="cTotalSub">—</div></div>
+    <div class="card c-used"> <div class="card-label">Used</div>     <div class="card-val" id="cUsed">—</div> <div class="card-sub" id="cUsedSub">—</div></div>
+    <div class="card c-avail"><div class="card-label">Available</div><div class="card-val" id="cAvail">—</div><div class="card-sub" id="cAvailSub">—</div></div>
+    <div class="card c-cache"><div class="card-label">Cached</div>   <div class="card-val" id="cCache">—</div><div class="card-sub">Page cache + reclaimable</div></div>
+    <div class="card c-buf">  <div class="card-label">Buffers</div>  <div class="card-val" id="cBuf">—</div>  <div class="card-sub">Disk I/O buffers</div></div>
+    <div class="card c-swap"> <div class="card-label">Swap Used</div><div class="card-val" id="cSwap">—</div><div class="card-sub" id="cSwapSub">—</div></div>
+  </div>
+
+  <!-- Usage bar -->
+  <div class="bar-card">
+    <div class="bar-row"><span>Memory Distribution</span><span id="barSum">—</span></div>
+    <div class="bar-track">
+      <div class="seg s-used"  id="bUsed"></div>
+      <div class="seg s-cache" id="bCache"></div>
+      <div class="seg s-buf"   id="bBuf"></div>
+    </div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>Used</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>Cached</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--orange)"></div>Buffers</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--surface2);border:1px solid var(--border)"></div>Free</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts">
+    <div class="chart-card">
+      <div class="chart-title">Memory Timeline — last 60 samples</div>
+      <canvas id="lineChart" height="210"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Memory Breakdown</div>
+      <canvas id="donut" height="210"></canvas>
+    </div>
+  </div>
+
+  <!-- Raw table -->
+  <div class="tbl-card">
+    <div class="tbl-hdr">/proc/meminfo — Raw Values</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Key</th><th>kB</th><th>Human</th><th>% of Total</th><th>Bar</th></tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="5" style="text-align:center;padding:22px;color:var(--muted)">Waiting for device data…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const fmt = kb => {
+  if (kb==null) return '—';
+  if (kb>=1048576) return (kb/1048576).toFixed(2)+' GB';
+  if (kb>=1024)    return (kb/1024).toFixed(1)+' MB';
+  return kb+' kB';
+};
+const pct = (a,b) => b ? Math.min(100,a/b*100) : 0;
+
+// ── History store ──────────────────────────────────────
+const MAX = 60;
+const H = {labels:[],used:[],avail:[],cached:[],free:[]};
+
+// ── Line chart ─────────────────────────────────────────
+const lc = new Chart(document.getElementById('lineChart').getContext('2d'),{
+  type:'line',
+  data:{
+    labels:H.labels,
+    datasets:[
+      {label:'Used',     data:H.used,   borderColor:'#f85149',backgroundColor:'rgba(248,81,73,.12)',  fill:true, tension:.3,pointRadius:0,borderWidth:2},
+      {label:'Available',data:H.avail,  borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,.05)',  fill:false,tension:.3,pointRadius:0,borderWidth:2},
+      {label:'Cached',   data:H.cached, borderColor:'#bc8cff',backgroundColor:'rgba(188,140,255,.05)',fill:false,tension:.3,pointRadius:0,borderWidth:2},
+      {label:'Free',     data:H.free,   borderColor:'#58a6ff',backgroundColor:'rgba(88,166,255,.05)', fill:false,tension:.3,pointRadius:0,borderWidth:1.5},
+    ]
+  },
+  options:{
+    responsive:true,animation:{duration:250},
+    interaction:{intersect:false,mode:'index'},
+    plugins:{
+      legend:{labels:{color:'#7d8590',boxWidth:12,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`}}
+    },
+    scales:{
+      x:{ticks:{color:'#7d8590',maxTicksLimit:8,font:{size:10}},grid:{color:'rgba(48,54,61,.5)'}},
+      y:{
+        ticks:{color:'#7d8590',font:{size:10},callback:v=>fmt(v)},
+        grid:{color:'rgba(48,54,61,.5)'}
+      }
+    }
+  }
+});
+
+// ── Donut chart ────────────────────────────────────────
+const dc = new Chart(document.getElementById('donut').getContext('2d'),{
+  type:'doughnut',
+  data:{
+    labels:['Used','Cached','Buffers','Free'],
+    datasets:[{
+      data:[0,0,0,0],
+      backgroundColor:['#f85149','#bc8cff','#f0883e','#21262d'],
+      borderColor:'#161b22',borderWidth:3,hoverOffset:8
+    }]
+  },
+  options:{
+    responsive:true,cutout:'68%',
+    plugins:{
+      legend:{labels:{color:'#7d8590',boxWidth:12,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}
+    }
+  }
+});
+
+// ── Dashboard update ───────────────────────────────────
+function update(m) {
+  const total  = m.MemTotal      || 0;
+  const free   = m.MemFree       || 0;
+  const avail  = m.MemAvailable  || 0;
+  const bufs   = m.Buffers       || 0;
+  const cached = (m.Cached||0) + (m.SReclaimable||0);
+  const used   = Math.max(0, total - free - bufs - cached);
+  const swapT  = m.SwapTotal || 0;
+  const swapF  = m.SwapFree  || 0;
+  const swapU  = swapT - swapF;
+
+  // Cards
+  set('cTotal',   fmt(total));     set('cTotalSub', total.toLocaleString()+' kB');
+  set('cUsed',    fmt(used));      set('cUsedSub',  pct(used,total).toFixed(1)+'% of total');
+  set('cAvail',   fmt(avail));     set('cAvailSub', pct(avail,total).toFixed(1)+'% available');
+  set('cCache',   fmt(cached));
+  set('cBuf',     fmt(bufs));
+  set('cSwap',    fmt(swapU));
+  set('cSwapSub', swapT>0 ? pct(swapU,swapT).toFixed(1)+'% of '+fmt(swapT) : 'No swap configured');
+
+  // Bar
+  setW('bUsed',  pct(used,  total));
+  setW('bCache', pct(cached,total));
+  setW('bBuf',   pct(bufs,  total));
+  set('barSum',  fmt(used)+' used of '+fmt(total));
+
+  // History
+  const t = new Date().toLocaleTimeString('en',{hour12:false});
+  H.labels.push(t); H.used.push(used); H.avail.push(avail);
+  H.cached.push(cached); H.free.push(free);
+  if (H.labels.length>MAX){
+    ['labels','used','avail','cached','free'].forEach(k=>H[k].shift());
+  }
+  lc.update('none');
+
+  // Donut
+  dc.data.datasets[0].data = [used, cached, bufs, free];
+  dc.update('none');
+
+  // Raw table
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  for (const [k,v] of Object.entries(m)) {
+    const p = pct(v,total).toFixed(1);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td class="k">${k}</td>`+
+      `<td class="v">${v.toLocaleString()}</td>`+
+      `<td>${fmt(v)}</td>`+
+      `<td>${total>0?p+'%':'—'}</td>`+
+      `<td><div class="mini-bar"><div class="mini-fill" style="width:${p}%"></div></div></td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function set(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+function setW(id,p){const el=document.getElementById(id);if(el)el.style.width=p+'%';}
+
+// ── WebSocket with auto-reconnect ──────────────────────
+let ws, rtimer;
+
+function badge(state,txt){
+  const b=document.getElementById('badge');
+  const d=b.querySelector('.dot');
+  b.className='badge '+state;
+  d.className='dot'+(state==='ok'?'':' pulse');
+  document.getElementById('badge-txt').textContent=txt;
+}
+
+function connect(){
+  clearTimeout(rtimer);
+  badge('wait','Connecting');
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onopen  = ()=> badge('ok','Connected');
+  ws.onclose = ()=>{ badge('err','Disconnected'); rtimer=setTimeout(connect,3000); };
+  ws.onerror = ()=> ws.close();
+  ws.onmessage = e => {
+    const p = JSON.parse(e.data);
+    const eb = document.getElementById('errBar');
+    if (p.error) {
+      eb.style.display='block';
+      eb.textContent='ADB Error: '+p.error;
+      badge('err','ADB Error');
+    } else {
+      eb.style.display='none';
+      update(p.data);
+      set('ts','Updated '+new Date(p.timestamp).toLocaleTimeString());
+    }
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
